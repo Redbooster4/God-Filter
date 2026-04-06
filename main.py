@@ -737,6 +737,20 @@ def detect_open_palm(hand_landmarks, frame_h):
     return extended >= 4   # at least 4/5 fingers extended = open palm
 
 # ─── MAIN FRAME PROCESSOR ──────────────────────────────────────────────────────
+PROCESS_EVERY = 2
+def smooth_frame(prev, curr, alpha=0.7):
+
+    if prev is None:
+        return curr
+
+    return cv2.addWeighted(
+        curr,
+        alpha,
+        prev,
+        1-alpha,
+        0
+    )
+
 def process_frame(frame, current_filter, store, frame_idx):
     """
     Returns: (processed_frame, active_filter, trigger_info_dict)
@@ -753,7 +767,10 @@ def process_frame(frame, current_filter, store, frame_idx):
                 info["palm"] = True
 
     # ── Face detection ──────────────────────────────────────
-    face_results = face_mesh.process(rgb)
+    if fidx % PROCESS_EVERY == 0:
+        face_results = face_mesh.process(rgb)
+    else:
+        face_results = None
 
     if face_results.multi_face_landmarks:
         for face in face_results.multi_face_landmarks:
@@ -967,7 +984,8 @@ if not stop:
             st.session_state.palm_cooldown      = frame_idx + 90
 
         # ── HUD overlay ────────────────────────────────────
-        hud = frame.copy()
+        hud = smooth_frame(prev_frame, frame)
+        prev_frame = hud.copy()
         cv2.putText(hud, f"FPS: {int(fps)}",
                     (16, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (80, 220, 80), 2)
         cv2.putText(hud, f"FILTER: {FILTER_NAMES[active_filter].upper()}",
